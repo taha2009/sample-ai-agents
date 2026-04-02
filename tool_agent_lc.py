@@ -1,4 +1,4 @@
-"""LangChain + Google Gemini agent with bound tools (weather + news demos)."""
+"""LangGraph + Google Gemini agent with bound tools (weather + news demos)."""
 
 import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
 
@@ -8,9 +8,12 @@ load_dotenv()
 
 import os
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 
@@ -51,7 +54,7 @@ _LATEST_NEWS_BY_TOPIC = {
 
 @tool
 def get_weather(city_name: str) -> str:
-    """Return weather for the given city name."""
+    """Return current weather for the given city (demo data for supported cities)."""
     key = city_name.strip().lower()
     if key in _WEATHER_BY_CITY:
         return _WEATHER_BY_CITY[key]
@@ -60,7 +63,11 @@ def get_weather(city_name: str) -> str:
 
 @tool
 def get_latest_news(topic: str = "general") -> str:
-    """Return the latest news headlines for a topic (demo hardcoded feed)."""
+    """Return the latest news headlines for a topic (demo hardcoded feed).
+
+    `topic`: one of general, world, tech, sports (technology is an alias for tech).
+    Omit or use general when the user does not specify a topic.
+    """
     key = topic.strip().lower().replace(" ", "_")
     if not key:
         key = "general"
@@ -70,51 +77,55 @@ def get_latest_news(topic: str = "general") -> str:
 
 
 TOOLS = [get_weather, get_latest_news]
-_TOOL_BY_NAME = {t.name: t for t in TOOLS}
 
 SYSTEM_PROMPT = """
-You are a helpful AI assistant.
-
-You can call get_weather(city_name) when the user asks about weather in a city.
-You can call get_latest_news(topic) when the user asks for news; use topic "general"
-if they do not specify one (supported demo topics: general, world, tech, sports).
-Summarize tool results clearly for the user.
-
-Guidelines:
-- Be concise
-- Ask clarifying questions if needed
-- Provide structured and clear answers
+You are a helpful assistant.
+Use tools when they are the right way to answer; summarize tool results clearly for the user.
+Be concise, structured, and ask clarifying questions when needed.
 """
 
 
-def _run_tool_calls(ai: AIMessage) -> list[ToolMessage]:
-    out: list[ToolMessage] = []
-    for call in ai.tool_calls:
-        name = call["name"]
-        args = call.get("args") or {}
-        tool_call_id = call.get("id") or ""
-        tool_fn = _TOOL_BY_NAME.get(name)
-        if tool_fn is None:
-            content = f"Unknown tool: {name}"
-        else:
-            content = str(tool_fn.invoke(args))
-        out.append(ToolMessage(content=content, tool_call_id=tool_call_id))
-    return out
-
-
-def run_agent() -> None:
+def build_agent():
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_MODEL,
         google_api_key=os.getenv("GEMINI_API_KEY"),
     )
     llm_tools = llm.bind_tools(TOOLS)
 
-    system = SystemMessage(content=SYSTEM_PROMPT.strip())
-    history: list[SystemMessage | HumanMessage | AIMessage | ToolMessage] = [system]
+    def call_model(state: MessagesState):
+        msgs = list(state["messages"])
+        if not any(isinstance(m, SystemMessage) for m in msgs):
+            msgs = [SystemMessage(content=SYSTEM_PROMPT.strip()), *msgs]
+        response = llm_tools.invoke(msgs)
+        return {"messages": [response]}
+
+    graph = StateGraph(MessagesState)
+    graph.add_node("agent", call_model)
+    graph.add_node("tools", ToolNode(TOOLS))
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges("agent", tools_condition)
+    graph.add_edge("tools", "agent")
+
+    checkpointer = MemorySaver()
+    return graph.compile(checkpointer=checkpointer)
+
+
+def _last_ai_text(messages: list) -> str:
+    for m in reversed(messages):
+        if isinstance(m, AIMessage) and not m.tool_calls:
+            c = m.content
+            return c if isinstance(c, str) else str(c)
+    return ""
+
+
+def run_agent() -> None:
+    app = build_agent()
+    thread_id = "cli-session"
+    config = {"configurable": {"thread_id": thread_id}}
 
     print(
-        "LangChain + Gemini + get_weather & get_latest_news "
-        "(type 'exit' to quit)\n"
+        "LangGraph + Gemini + get_weather & get_latest_news "
+        "(MemorySaver checkpointer; type 'exit' to quit)\n"
     )
 
     while True:
@@ -124,17 +135,11 @@ def run_agent() -> None:
             print("Goodbye.")
             break
 
-        history.append(HumanMessage(content=user_input))
-        ai = llm_tools.invoke(history)
-
-        while ai.tool_calls:
-            history.append(ai)
-            history.extend(_run_tool_calls(ai))
-            ai = llm_tools.invoke(history)
-
-        text = ai.content if isinstance(ai.content, str) else str(ai.content)
-        history.append(ai)
-
+        result = app.invoke(
+            {"messages": [HumanMessage(content=user_input)]},
+            config=config,
+        )
+        text = _last_ai_text(result["messages"])
         print(f"Agent: {text}\n")
 
 
