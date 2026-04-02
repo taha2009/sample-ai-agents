@@ -1,15 +1,15 @@
-# Google GenAI test (Gemini CLI)
+# Google GenAI test
 
-A small interactive CLI that chats with the Gemini API using the official `google-genai` Python SDK.
+Small training-style examples for **Gemini** using the official [`google-genai`](https://github.com/googleapis/python-genai) Python SDK, plus optional **LangChain** (`langchain-google-genai`) variants of the same ideas.
 
 ## Prerequisites
 
-- Python 3.10+ (recommended)
-- A Gemini API key
+- Python 3.10+ (3.13 works with these scripts; RAG uses **FastEmbed/ONNX**, not PyTorch)
+- A [Gemini API key](https://ai.google.dev/gemini-api/docs/api-key)
 
 ## Setup
 
-1. Create and activate a virtual environment (optional but recommended):
+1. Create and activate a virtual environment (recommended):
 
    ```bash
    python -m venv .venv
@@ -22,29 +22,53 @@ A small interactive CLI that chats with the Gemini API using the official `googl
    pip install -r requirements.txt
    ```
 
-3. Configure your API key:
+3. Environment variables:
 
-   - Copy the sample env file to `.env` (Windows: `copy .env.example .env`; macOS/Linux: `cp .env.example .env`).
+   - Copy `.env.example` to `.env` (Windows: `copy .env.example .env`; macOS/Linux: `cp .env.example .env`).
+   - Set **`GEMINI_API_KEY`** in `.env`.
+   - Optionally set **`GEMINI_MODEL`** (default in code: `gemini-2.5-flash-lite` if unset).
+   - For **RAG** scripts, optionally set **`EMBEDDING_MODEL`** (default: `BAAI/bge-small-en-v1.5` via FastEmbed).
 
-   - Open `.env` and set `GEMINI_API_KEY` to your key.
+   The apps load `.env` via `python-dotenv`. You can also export variables in the shell instead of using a file.
 
-   Optionally set `GEMINI_MODEL` to a model id (default if omitted: `gemini-2.5-flash-lite`).
-
-   The app loads variables from `.env` via `python-dotenv`. You can also set `GEMINI_API_KEY` and `GEMINI_MODEL` in the shell instead of using a file.
+4. **LangChain tracing (optional):** If you use the `*_lc.py` scripts and want [LangSmith](https://docs.smith.langchain.com/) traces, fill in the `LANGSMITH_*` entries in `.env.example` / `.env`. They are not required for local runs.
 
 ## Run
 
-```bash
-python main.py
-```
+Each script is a simple REPL: type messages, then **`exit`** to quit.
 
-Type messages at the prompt; enter `exit` to quit.
+### Direct `google-genai` SDK
 
-## Files
+| Command | What it does |
+|--------|----------------|
+| `python agent.py` | Chat with conversation memory (`generate_content`). |
+| `python tool_agent.py` | Chat with **tools**: `get_weather` (demo cities) and `get_latest_news` (demo topics), via SDK automatic function calling. |
+| `python rag_agent.py` | **RAG**: in-memory **Chroma** + **FastEmbed** embeddings, then answer from retrieved context. |
 
-| File | Purpose |
+### LangChain (`langchain-google-genai`)
+
+| Command | What it does |
+|--------|----------------|
+| `python agent_lc.py` | Same idea as `agent.py`, using `ChatGoogleGenerativeAI` + message history. |
+| `python tool_agent_lc.py` | Same tool demos as `tool_agent.py`, bound as LangChain tools. |
+| `python rag_agent_lc.py` | Same RAG pipeline as `rag_agent.py`, generation via LangChain. |
+
+`lc_transformers_shim.py` is imported by the `*_lc.py` scripts **before** LangChain so optional tokenizer paths that pull in `torch` are skipped. Do not use that shim for code that needs the real Hugging Face stack.
+
+## Project layout
+
+| Path | Purpose |
 |------|---------|
-| `main.py` | CLI loop and Gemini calls |
-| `requirements.txt` | Python dependencies |
-| `.env.example` | Template for environment variables (safe to commit) |
-| `.env` | Your real key (ignored by git; create locally) |
+| `agent.py` | Minimal Gemini CLI chat |
+| `tool_agent.py` | Gemini + tools (weather / news demos) |
+| `rag_agent.py` | Vector RAG (Chroma + FastEmbed + Gemini) |
+| `agent_lc.py` / `tool_agent_lc.py` / `rag_agent_lc.py` | LangChain equivalents |
+| `lc_transformers_shim.py` | Optional import shim for LangChain on fragile `torch` setups |
+| `requirements.txt` | Dependencies |
+| `.env.example` | Template for `GEMINI_*`, optional `EMBEDDING_MODEL`, optional LangSmith |
+| `.env` | Your secrets (create locally; ignored by git) |
+
+## Notes
+
+- **RAG:** First run may download a small ONNX embedding model from Hugging Face; the vector store is **ephemeral** (in RAM only).
+- **Training:** Tool responses and news text are **hardcoded demos**, not live APIs.
