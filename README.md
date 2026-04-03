@@ -11,9 +11,20 @@ Small training-style examples for **Gemini** using the official [`google-genai`]
 
 1. Create and activate a virtual environment (recommended):
 
-   ```bash
+   **Windows (PowerShell):**
+
+   ```powershell
    python -m venv .venv
-   .venv\Scripts\activate
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+   If activation is blocked by execution policy, run once: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`.
+
+   **macOS / Linux:**
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 
 2. Install dependencies:
