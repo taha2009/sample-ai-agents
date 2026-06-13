@@ -2,9 +2,6 @@ import json
 from typing import Annotated
 
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -14,6 +11,8 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import StreamWriter
 from typing_extensions import TypedDict
+
+load_dotenv()
 
 
 class State(TypedDict):
