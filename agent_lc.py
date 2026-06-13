@@ -1,8 +1,8 @@
 """LangChain + Google Gemini CLI agent (conversation memory via message list)."""
 
-import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
-
 from dotenv import load_dotenv
+
+import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
 
 load_dotenv()
 
@@ -44,7 +44,11 @@ def run_agent() -> None:
 
         messages.append(HumanMessage(content=user_input))
         response = llm.invoke(messages)
-        text = response.content if isinstance(response.content, str) else str(response.content)
+        text = (
+            response.content
+            if isinstance(response.content, str)
+            else str(response.content)
+        )
 
         print(f"Agent: {text}\n")
 

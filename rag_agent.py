@@ -141,9 +141,7 @@ def retrieve(
 def _format_context(chunks: list[dict[str, Any]]) -> str:
     parts = []
     for i, doc in enumerate(chunks, start=1):
-        parts.append(
-            f"[{i}] id={doc['id']} title={doc['title']}\n{doc['text']}"
-        )
+        parts.append(f"[{i}] id={doc['id']} title={doc['title']}\n{doc['text']}")
     return "\n\n".join(parts)
 
 

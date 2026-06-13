@@ -1,6 +1,7 @@
-from google import genai
 import os
+
 from dotenv import load_dotenv
+from google import genai
 
 load_dotenv()
 
@@ -23,6 +24,7 @@ Guidelines:
 # 🧾 Conversation memory
 history = []
 
+
 def run_agent():
     print("🧠 Gemini CLI Agent (type 'exit' to quit)\n")
 
@@ -40,18 +42,18 @@ def run_agent():
         contents.extend(history)
 
         # Add current user input (each part must be a text object, not a bare string)
-        contents.append({
-            "role": "user",
-            "parts": [{"text": user_input}],
-        })
+        contents.append(
+            {
+                "role": "user",
+                "parts": [{"text": user_input}],
+            }
+        )
 
         # 🤖 Call Gemini
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
-            config={
-                "system_instruction": SYSTEM_PROMPT
-            }
+            config={"system_instruction": SYSTEM_PROMPT},
         )
 
         text = response.text
@@ -59,14 +61,18 @@ def run_agent():
         print(f"Agent: {text}\n")
 
         # 💾 Save memory
-        history.append({
-            "role": "user",
-            "parts": [{"text": user_input}],
-        })
-        history.append({
-            "role": "model",
-            "parts": [{"text": text}],
-        })
+        history.append(
+            {
+                "role": "user",
+                "parts": [{"text": user_input}],
+            }
+        )
+        history.append(
+            {
+                "role": "model",
+                "parts": [{"text": text}],
+            }
+        )
 
 
 if __name__ == "__main__":

@@ -1,21 +1,19 @@
+import json
 from typing import Annotated
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from typing_extensions import TypedDict
-
 from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 from langchain_core.tools import tool
-
 from langchain_google_genai import ChatGoogleGenerativeAI
-
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph, START
+from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import StreamWriter
+from typing_extensions import TypedDict
 
 
 class State(TypedDict):
@@ -32,7 +30,7 @@ tools = [get_weather]
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
-    temperature=1,        # required when thinking is enabled
+    temperature=1,  # required when thinking is enabled
     streaming=True,
     thinking_budget=1024,
     include_thoughts=True,
@@ -45,7 +43,12 @@ def chatbot(state: State, writer: StreamWriter):
     writer({"event": "llm_start", "msg_count": len(state["messages"])})
     response = llm_with_tools.invoke(state["messages"])
     if response.tool_calls:
-        writer({"event": "tool_calls_planned", "calls": [tc["name"] for tc in response.tool_calls]})
+        writer(
+            {
+                "event": "tool_calls_planned",
+                "calls": [tc["name"] for tc in response.tool_calls],
+            }
+        )
     else:
         writer({"event": "final_answer", "content": str(response.content)})
     return {"messages": [response]}
@@ -70,9 +73,10 @@ def print_event(i: int, mode: str, event):
     if mode == "messages":
         chunk, metadata = event
         print(f"  type       : {type(chunk).__name__}")
-        print(f"  node       : {metadata.get('langgraph_node')}  (step {metadata.get('langgraph_step')})")
+        print(
+            f"  node       : {metadata.get('langgraph_node')}  (step {metadata.get('langgraph_step')})"
+        )
 
-        # content can be a string or a list of blocks (text / thinking)
         if isinstance(chunk.content, list):
             for block in chunk.content:
                 btype = block.get("type", "?")
@@ -82,6 +86,7 @@ def print_event(i: int, mode: str, event):
                     print(f"  [text]     : {block.get('text', '')!r}")
                 else:
                     print(f"  [{btype}]  : {block!r}")
+            # print(f"  content    : {json.dumps(chunk.content, indent=4)}")
         else:
             print(f"  content    : {chunk.content!r}")
 
@@ -133,11 +138,13 @@ def run():
             break
 
         print()
-        for i, (mode, event) in enumerate(graph.stream(
-            {"messages": [("user", user_input)]},
-            config=config,
-            stream_mode=["messages"], # can also include "custom" and "updates"
-        )):
+        for i, (mode, event) in enumerate(
+            graph.stream(
+                {"messages": [("user", user_input)]},
+                config=config,
+                stream_mode=["messages"],  # can also include "custom" and "updates"
+            )
+        ):
             print_event(i, mode, event)
 
         print()

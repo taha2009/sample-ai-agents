@@ -1,8 +1,8 @@
 """LangGraph + Google Gemini agent with bound tools (weather + news demos)."""
 
-import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
-
 from dotenv import load_dotenv
+
+import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
 
 load_dotenv()
 

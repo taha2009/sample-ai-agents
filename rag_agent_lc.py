@@ -5,9 +5,9 @@ generation via ChatGoogleGenerativeAI (langchain-google-genai).
 
 from __future__ import annotations
 
-import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
-
 from dotenv import load_dotenv
+
+import lc_transformers_shim  # noqa: F401 — before langchain (optional tokenizer vs. broken torch)
 
 load_dotenv()
 
@@ -140,9 +140,7 @@ def retrieve(
 def _format_context(chunks: list[dict[str, Any]]) -> str:
     parts = []
     for i, doc in enumerate(chunks, start=1):
-        parts.append(
-            f"[{i}] id={doc['id']} title={doc['title']}\n{doc['text']}"
-        )
+        parts.append(f"[{i}] id={doc['id']} title={doc['title']}\n{doc['text']}")
     return "\n\n".join(parts)
 
 
